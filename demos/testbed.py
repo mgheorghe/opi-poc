@@ -18,6 +18,15 @@ BF2_INTERFACES = ['enp3s0f1s0', 'enp3s0f0s0']
 DH3_IP = '172.22.1.3'
 #DH3_INTERFACES = ['ens1f0np0', 'ens1f1np1']
 
+# DPU HOST 4
+DH4_IP = '172.22.1.4'
+#DH3_INTERFACES = ['ens1f0np0', 'ens1f1np1']
+
+# DPU HOST 4
+DYP_IP = '172.22.4.4'
+DYP_INTERFACES = ['enp0s1f0d1', 'enp0s1f0d2']
+
+
 # TGEN SERVER 1
 TGEN1_IP = '172.22.1.100'
 TGEN1_INTERFACES = ['ens1f0np0', 'ens1f1np1']

@@ -111,3 +111,34 @@ git clone https://github.com/opiproject/testing
 docker build --no-cache --tag opi/test-framework:latest ./testing/framework
 docker tag opi/test-framework:latest opi/test-framework:1.0.0 # we can chose a versioning schema for the containers
 ```
+
+* create opi ci user
+
+```Shell
+useradd -m -s /bin/bash opi
+usermod -aG docker opi # add user to docker group
+passwd opi # set password
+```
+
+* install github self-hosted runner
+
+```Shell
+# TBD
+```
+
+* create ssh key pair for the user opi
+
+```Shell
+sudo -u opi ssh-keygen -t rsa -b 4096 -C "[email protected]"
+```
+
+* push the ssh key to all other devices that are part of the testbed
+
+```Shell
+ssh-copy-id root@172.22.1.1
+ssh-copy-id root@172.22.1.2
+ssh-copy-id root@172.22.1.3
+ssh-copy-id root@172.22.1.4
+# ...
+``` 
+[^1]: Any other linux version will work, but the commands might need to be adjusted accordingly.
