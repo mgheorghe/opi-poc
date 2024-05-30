@@ -2,17 +2,17 @@
 
 ## hardware
 
-- server with Ubuntu 22.04
-- Nvidia BlueField2
-- Keysight CloudStorm 100G
+- server with Ubuntu 22.04 or 24.04
+- Nvidia BlueField2 or BlueField3
+- Keysight IxLoad CloudStorm 100G or CyPerf
 
 ## configuration
 
 ### host (the server holding the DPU)
 
-- install Ubuntu 22.04 server
-- install `MLNX_OFED_LINUX-5.8-1.1.2.1-ubuntu22.04-x86_64.iso`
-- install `DOCA_1.5.1_BSP_3.9.3_Ubuntu_20.04-4.2211-LTS.signed.bfb` on the BlueField2
+- install Ubuntu 22.04 or 24.04 server
+- install host side driver `MLNX_OFED_LINUX-24.04-0.6.6.0-ubuntu22.04-x86_64.iso`
+- install DOCA `bf-bundle-2.7.0-33_24.04_ubuntu-22.04_prod.bfb` on the BlueField2
 - set BlueField2 in SEPARATED_HOST mode to make things easier
 
 ```Shell
@@ -93,3 +93,15 @@ python3
 - load `opi-ipsec-demo-1.rxf`
 - assign the ports
 - click start button
+
+### cyperf
+
+```Shell
+git clone https://github.com/opiproject/opi-poc.git
+
+pip3 install pydpu
+pip3 install opi-poc/demos/security/nvidia/requirements.txt
+
+pytest -s opi-poc/demos/security/nvidia/test_ipsec.py
+
+```

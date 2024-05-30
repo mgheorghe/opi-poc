@@ -1,0 +1,40 @@
+---
+version: '3.9'
+
+services:
+
+  controller:
+    image: ${DOCKER_REGISTRY}/keng-controller:${CONTROLLER_VERSION:-latest}
+    container_name: keng-controller-${USER}
+    command: --accept-eula
+    network_mode: "host"
+    restart: always
+  traffic_engine_1:
+    image: ${DOCKER_REGISTRY}/ixia-c-traffic-engine:${TRAFFIC_ENGINE_VERSION:-latest}
+    container_name: ixia-c-traffic-engine1-${USER}
+    network_mode: "host"
+    restart: always
+    privileged: true
+    cpuset: ${CPU_CORES_IFC1:-"0,1,2"}
+    environment:
+      - OPT_LISTEN_PORT=${TCP_PORT_IFC1:-5555}
+      - ARG_IFACE_LIST=virtual@af_packet,${IFC1}
+      - OPT_NO_HUGEPAGES=Yes
+      - OPT_ENABLE_IPv6=${OPT_ENABLE_IPv6}
+
+  traffic_engine_2:
+    image: ${DOCKER_REGISTRY}/ixia-c-traffic-engine:${TRAFFIC_ENGINE_VERSION:-latest}
+    container_name: ixia-c-traffic-engine2-${USER}
+    network_mode: "host"
+    restart: always
+    privileged: true
+    cpuset: ${CPU_CORES_IFC2:-"0,3,4"}
+    environment:
+      - OPT_LISTEN_PORT=${TCP_PORT_IFC2:-5556}
+      - ARG_IFACE_LIST=virtual@af_packet,${IFC2}
+      - OPT_NO_HUGEPAGES=Yes
+      - OPT_ENABLE_IPv6=${OPT_ENABLE_IPv6}
+  aur:
+    image: ghcr.io/open-traffic-generator/keng-app-usage-reporter:${AUR_VERSION:-latest}
+    network_mode: "host"
+    restart: always
