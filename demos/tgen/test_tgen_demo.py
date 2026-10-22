@@ -121,11 +121,11 @@ def host():
     host_connect.disconnect()
 
 
-@pytest.fixture
-def switch():
+@pytest.fixture(scope='session')
+def switch_session():
     '''
-    Yields a function that moves switch ports into a vlan, so each test wires the tgen ports to the
-    dpu ports it needs. The original vlans are restored afterwards; the config is never saved.
+    Switch connection shared by the tests, and the vlans they created. The vlans are only deleted
+    at the end of the session: a vlan created again seconds after `no vlan` drops its traffic.
     '''
     switch_info = {
         'device_type': 'arista_eos',
@@ -136,8 +136,23 @@ def switch():
     }
     switch_connect = netmiko.ConnectHandler(**switch_info)
     switch_connect.enable()
-    saved_vlans = {}
     new_vlans = []
+
+    yield switch_connect, new_vlans
+
+    for vlan in new_vlans:
+        switch_connect.send_config_set(['no vlan %d' % vlan])
+    switch_connect.disconnect()
+
+
+@pytest.fixture
+def switch(switch_session):
+    '''
+    Yields a function that moves switch ports into a vlan, so each test wires the tgen ports to the
+    dpu ports it needs. The original vlans are restored afterwards; the config is never saved.
+    '''
+    switch_connect, new_vlans = switch_session
+    saved_vlans = {}
 
     def access_vlan(vlan, ports):
         if 'not found' in switch_connect.send_command('show vlan %d' % vlan):
@@ -155,9 +170,6 @@ def switch():
 
     for port, vlan in saved_vlans.items():
         switch_connect.send_config_set(['interface %s' % port, 'switchport access vlan %d' % vlan])
-    for vlan in new_vlans:
-        switch_connect.send_config_set(['no vlan %d' % vlan])
-    switch_connect.disconnect()
 
 
 def test_server_to_server_via_dpu(dpu, server, switch):
