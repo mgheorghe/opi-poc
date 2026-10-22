@@ -4,20 +4,11 @@ jobs:
   opi-tgen:
     runs-on: self-hosted
     steps:
-        - uses: actions/checkout@v1
-        - name: pytest-run0
-          run: id
-        - name: pytest-run1
-          run: ls
-        - name: pytest-run2
-          run: pwd
-        - name: pytest-run3
+        - uses: actions/checkout@v4
+        - name: Install python requirements
           run: pip install -r ./demos/tgen/requirements.txt
-        - name: pytest-run4
-          run: pytest -s ./tgen/test_tgen_demo.py
-          working-directory: ./demos
-          env:
-            PYTHONPATH: ${PYTHONPATH}:${{ github.workspace }}/demos
+        - name: Run tgen test automation
+          run: pytest -s ./demos/tgen/test_tgen_demo.py
 
   opi-ipsec:
     runs-on: self-hosted
