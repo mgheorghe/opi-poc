@@ -33,6 +33,8 @@ def dpu():
     }
     dpu_connect = netmiko.ConnectHandler(**dpu_info)
     #prompt = dpu_connect.find_prompt()
+    # a killed run skips the teardown; drop its 200-203.0.0.1 addresses, or their routes win
+    dpu_connect.send_command('ip -4 addr flush to 200.0.0.0/6')
     dpu_connect.send_command('ip addr add 200.0.0.1/24 dev %s' % BF2_INTERFACES[0])
     dpu_connect.send_command('ip addr add 201.0.0.1/24 dev %s' % BF2_INTERFACES[1])
     # pf0hpf/pf1hpf are ovs ports, so the arm kernel never receives on them; the sf on the same
