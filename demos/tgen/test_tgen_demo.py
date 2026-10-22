@@ -1,3 +1,4 @@
+import functools
 import json
 import os
 import sys
@@ -82,6 +83,7 @@ def server():
     server_connect = netmiko.ConnectHandler(**server_info)
     output = server_connect.send_command('docker compose -f %s/demos/tgen/deployment/tgen.yml up -d' % HOME_FOLDER, read_timeout=30)
     print(output)
+    wait_for_controller(server_connect, '%s/demos/tgen/deployment/tgen.yml' % HOME_FOLDER)
 
     yield server_connect
 
@@ -113,6 +115,7 @@ def host():
 
     output = host_connect.send_command('docker compose -f ~/tgen.yaml up -d', read_timeout=30)
     print(output)
+    wait_for_controller(host_connect, '~/tgen.yaml')
 
     yield host_connect
 
@@ -176,7 +179,7 @@ def test_server_to_server_via_dpu(dpu, server, switch):
     switch(A100G_VLANS[0], [A100G_TGEN1_PORTS[0], A100G_BF2_PORTS[0]])
     switch(A100G_VLANS[1], [A100G_TGEN1_PORTS[1], A100G_BF2_PORTS[1]])
 
-    tgen = snappi.api(location=f'https://{TGEN1_IP}:8443', verify=False)
+    tgen = tgen_api(f'https://{TGEN1_IP}:8443')
     cfg = tgen.config()
     p1 = cfg.ports.port(name='server:p1', location=f'{TGEN1_IP}:5555')[-1]
     p2 = cfg.ports.port(name='server:p2', location=f'{TGEN1_IP}:5556')[-1]
@@ -228,7 +231,7 @@ def test_server_to_dpuhost_via_dpu(dpu, server, host, switch):
     # server:p1 reaches the dpu on 200.0.0.0/24, the dpu routes it to host:p1 through ovsbr1 and pf0hpf
     switch(A100G_VLANS[0], [A100G_TGEN1_PORTS[1], A100G_BF2_PORTS[0]])
 
-    tgen = snappi.api(location=f'https://{TGEN1_IP}:8443', verify=False)
+    tgen = tgen_api(f'https://{TGEN1_IP}:8443')
     cfg = tgen.config()
     p1 = cfg.ports.port(name='host:p1', location=f'{DH2_IP}:5555')[-1]
     p2 = cfg.ports.port(name='server:p1', location=f'{TGEN1_IP}:5556')[-1]
@@ -279,7 +282,7 @@ def test_dpuhost_to_dpuhost_via_dpu(dpu, host, switch):
     switch(A100G_VLANS[0], [A100G_BF2_PORTS[0]])
     switch(A100G_VLANS[1], [A100G_BF2_PORTS[1]])
 
-    tgen = snappi.api(location=f'https://{DH2_IP}:8443', verify=False)
+    tgen = tgen_api(f'https://{DH2_IP}:8443')
     cfg = tgen.config()
     p1 = cfg.ports.port(name='host:p1', location=f'{DH2_IP}:5555')[-1]
     p2 = cfg.ports.port(name='host:p2', location=f'{DH2_IP}:5556')[-1]
@@ -322,6 +325,25 @@ def test_dpuhost_to_dpuhost_via_dpu(dpu, host, switch):
     assert wait_for(lambda: metrics_ok(tgen)), 'Metrics validation failed!'
     # the frames must have been routed by the dpu, not looped back through the switch
     assert dpu_forwarded(dpu) - forwarded >= flow.duration.fixed_packets.packets, 'The dpu did not route the traffic!'
+
+
+def wait_for_controller(connect, compose_file):
+    '''
+    Waits until the controller has registered with the usage reporter. A set_config sent before
+    that is applied to the ports but never answered.
+    '''
+    assert wait_for(lambda: 'App usage reporting service is up' in connect.send_command(
+        'docker compose -f %s logs controller' % compose_file), timeout=60, interval=1), 'The controller did not come up!'
+
+
+def tgen_api(location):
+    '''
+    Returns a snappi api whose http requests time out, so a request the controller never answers
+    fails the test instead of hanging it. snappi sets no timeout on the http transport.
+    '''
+    tgen = snappi.api(location=location, verify=False)
+    tgen._transport._session.request = functools.partial(tgen._transport._session.request, timeout=60)
+    return tgen
 
 
 def dpu_mac(dpu_connect, peer_ip):
