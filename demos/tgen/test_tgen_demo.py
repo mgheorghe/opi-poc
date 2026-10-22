@@ -81,7 +81,7 @@ def server():
 
     yield server_connect
 
-    output = server_connect.send_command('docker compose -f %s/demos/tgen/deployment/tgen.yml down' % HOME_FOLDER)
+    output = server_connect.send_command('docker compose -f %s/demos/tgen/deployment/tgen.yml down' % HOME_FOLDER, read_timeout=30)
     print(output)
     server_connect.disconnect()
 
@@ -112,7 +112,7 @@ def host():
 
     yield host_connect
 
-    output = host_connect.send_command('docker compose -f ~/tgen.yaml down')
+    output = host_connect.send_command('docker compose -f ~/tgen.yaml down', read_timeout=30)
     print(output)
     host_connect.disconnect()
 
@@ -157,7 +157,7 @@ def switch():
 
 
 def test_server_to_server_via_dpu(dpu, server, switch):
-    # server:p2 reaches the dpu p1 side, the dpu routes the traffic out of p0 back to server:p1
+    # server:p2 reaches the dpu on 201.0.0.0/24, the dpu routes it back to server:p1 on 200.0.0.0/24
     switch(A100G_VLANS[0], [A100G_TGEN1_PORTS[0], A100G_BF2_PORTS[0]])
     switch(A100G_VLANS[1], [A100G_TGEN1_PORTS[1], A100G_BF2_PORTS[1]])
 
@@ -207,7 +207,7 @@ def test_server_to_server_via_dpu(dpu, server, switch):
 
 
 def test_server_to_dpuhost_via_dpu(dpu, server, host, switch):
-    # server:p1 reaches the dpu p0 side, the dpu routes the traffic to host:p1 over pf0hpf
+    # server:p1 reaches the dpu on 200.0.0.0/24, the dpu routes it to host:p1 over pf0hpf
     switch(A100G_VLANS[0], [A100G_TGEN1_PORTS[1], A100G_BF2_PORTS[0]])
 
     tgen = snappi.api(location=f'https://{TGEN1_IP}:8443', verify=False)
