@@ -1,4 +1,4 @@
-# from https://github.com/opiproject/lab/blob/main/ips.md
+# from https://github.com/opiproject/lab/blob/main/Documentation/ips.md
 
 # DPU HOST 1
 DH1_IP = '172.22.1.1'

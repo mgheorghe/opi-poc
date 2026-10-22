@@ -14,28 +14,28 @@
 any combination of host or server traffic originated to any of the 4 ports and targeted to any of the 4 ports (it could come back to itself)
 ![testbed diagram](./images/opi-lab-scenarios.drawio.svg)
 
-server to dpu, dpu forwording to the other port and back to the server
+server to dpu, dpu forwarding to the other port and back to the server
 ![test_server_to_server_via_dpu](./images/opi-lab-server2server.drawio.svg)
 
 server to dpu and dpu to the host
 ![test_server_to_dpuhost_via_dpu](./images/opi-lab-server2host.drawio.svg)
 
-host to the dpu, dpu forwording to the other vf port and back to the host
+host to the dpu, dpu forwarding to the other vf port and back to the host
 ![test_dpuhost_to_dpuhost_via_dpu](./images/opi-lab-host2host.drawio.svg)
 
 same scenarios as above but having the traffic inside the ipsec tunnel
-![test_server_to_server_via_ipsec_and_dpu](./images/opi-lab-scenarios-ipsec.drawio.svg)
+![ipsec scenarios](./images/opi-lab-scenarios-ipsec.drawio.svg)
 
 ### not covered
 
-same scenarios as above but having traffic generator endpoints also on the dpu (posible if dpu cores are x86 or arm and docker can be installed)
+same scenarios as above but having traffic generator endpoints also on the dpu (possible if dpu cores are x86 or arm and docker can be installed)
 ![tgen on dpu](./images/opi-lab-scenarios-with-dpu.drawio.svg)
 
 ## testing framework
 
-- to automate the opi cases it is prefered to use [python](https://www.python.org) language
-- as test framework it is prefered to use [pytest](https://docs.pytest.org)
-- for ssh conectivity it is sugested to use [netmiko](https://github.com/ktbyers/netmiko) package instead of [paramiko](https://www.paramiko.org), it uses paramiko and provides drivers for many devices + ability to write plugins
+- to automate the opi cases it is preferred to use [python](https://www.python.org) language
+- as test framework it is preferred to use [pytest](https://docs.pytest.org)
+- for ssh connectivity it is suggested to use [netmiko](https://github.com/ktbyers/netmiko) package instead of [paramiko](https://www.paramiko.org), it uses paramiko and provides drivers for many devices + ability to write plugins
 
 ## traffic generator
 
@@ -44,6 +44,19 @@ Open Traffic Generator (OTG) is an open standard, specifying declarative and ven
 - [open traffic generator website](https://otg.dev)
 - [open traffic generator implementation](https://github.com/open-traffic-generator)
 - [snappi api library for otg](https://pypi.org/project/snappi)
+
+## versions
+
+the demo is pinned to [Ixia-c release v1.62.0-1](https://github.com/open-traffic-generator/ixia-c/releases/tag/v1.62.0-1), the community edition needs no license for these 2 port tests
+
+| Component               | Version   | Pinned in          |
+|-------------------------|-----------|--------------------|
+| keng-controller         | 1.62.0-1  | `deployment/.env`  |
+| ixia-c-traffic-engine   | 1.8.0.544 | `deployment/.env`  |
+| keng-app-usage-reporter | 0.0.1-52  | `deployment/.env`  |
+| snappi                  | 1.62.0    | `requirements.txt` |
+
+to move to a newer release, take the versions from its release notes and update both files together
 
 ## to run the test
 
@@ -56,6 +69,10 @@ pip install --no-cache-dir -r ./opi-poc/demos/tgen/requirements.txt
 pytest -s ./opi-poc/demos/tgen/test_tgen_demo.py
 
 ```
+
+the test logs in as root over ssh to the server, the dpu and the dpu host (ips in [testbed.py](../testbed.py)) with the private key in `OPI_SSH_KEY`, default `~/.ssh/id_rsa`
+
+the server starts [tgen.yml](./deployment/tgen.yml) from the same repo path as the runner (`GITHUB_WORKSPACE` in ci, otherwise this clone), so run the test on the server or keep a checkout at the same path there; the dpu host gets `tgen.yml` and `.env` copied over scp
 
 ## notes, todo, etc
 
@@ -73,28 +90,13 @@ mlxconfig -d /dev/mst/mt41686_pciconf0 s INTERNAL_CPU_MODEL=1
 mlxconfig -d /dev/mst/mt41686_pciconf0.1 s INTERNAL_CPU_MODEL=1
 ```
 
-all paths are absolute paths from my demo testbed, those shoudl be fixed to be more flexible and map the git repo better
+the dpu fixture sets `ip_forward`, the iptables FORWARD policy and static arp entries, teardown only removes the ips and flushes arp
+
+the ipsec variant of these scenarios lives in [demos/security/nvidia](../security/nvidia), it assumes docker is installed on the dpu
 
 ```Shell
-example: in test_tgen_demo.py
-docker compose -f /root/opi/tgen/deployment/tgen.yml up -d
-```
-
-there is an assumption the files exist on host or dpu or the server like docker compose files
-
-```Shell
-example: in test_tgen_demo.py
-docker compose -f /root/opi/tgen/deployment/tgen.yml up -d
-```
-
-there is an assumption that docker is installed on the dpu
-
-```Shell
-example: in test_tgen_with_ipsec_demo.py
 systemctl start docker
 docker run --rm --network host --mount src=/var/run,target=/var/run,type=bind --name opi-strongswan-bridge -d ghcr.io/opiproject/opi-strongswan-bridge:main /opi-vici-bridge -port=50151
 ```
 
 care must be taken to prevent test traffic going out on management interface
-
-pydpu needs to be integrate din ipsec test
