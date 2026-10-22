@@ -35,8 +35,10 @@ def dpu():
     #prompt = dpu_connect.find_prompt()
     dpu_connect.send_command('ip addr add 200.0.0.1/24 dev %s' % BF2_INTERFACES[0])
     dpu_connect.send_command('ip addr add 201.0.0.1/24 dev %s' % BF2_INTERFACES[1])
-    dpu_connect.send_command('ip addr add 202.0.0.1/24 dev pf0hpf')
-    dpu_connect.send_command('ip addr add 203.0.0.1/24 dev pf1hpf')
+    # pf0hpf/pf1hpf are ovs ports, so the arm kernel never receives on them; the sf on the same
+    # ovs bridge is the arm's l3 interface towards each host pf
+    dpu_connect.send_command('ip addr add 202.0.0.1/24 dev %s' % BF2_INTERFACES[1])
+    dpu_connect.send_command('ip addr add 203.0.0.1/24 dev %s' % BF2_INTERFACES[0])
     dpu_connect.send_command('sysctl net.ipv4.ip_forward=1')
     dpu_connect.send_command('iptables -P FORWARD ACCEPT')
     dpu_connect.send_command('arp -s 200.0.0.2 80:09:02:02:00:01')
@@ -57,8 +59,8 @@ def dpu():
 
     dpu_connect.send_command('ip addr del 200.0.0.1/24 dev %s' % BF2_INTERFACES[0])
     dpu_connect.send_command('ip addr del 201.0.0.1/24 dev %s' % BF2_INTERFACES[1])
-    dpu_connect.send_command('ip addr del 202.0.0.1/24 dev pf0hpf')
-    dpu_connect.send_command('ip addr del 203.0.0.1/24 dev pf1hpf')
+    dpu_connect.send_command('ip addr del 202.0.0.1/24 dev %s' % BF2_INTERFACES[1])
+    dpu_connect.send_command('ip addr del 203.0.0.1/24 dev %s' % BF2_INTERFACES[0])
     dpu_connect.send_command('ip neigh flush 200.0.0.0/8')
     dpu_connect.send_command('ip neigh flush 201.0.0.0/8')
     dpu_connect.send_command('ip neigh flush 202.0.0.0/8')
@@ -194,6 +196,7 @@ def test_server_to_server_via_dpu(dpu, server, switch):
     tgen.set_config(cfg)
 
     print('Starting transmit on all configured flows ...')
+    forwarded = dpu_forwarded(dpu)
     cs = tgen.control_state()
     cs.traffic.flow_transmit.state = cs.traffic.flow_transmit.START
     tgen.set_control_state(cs)
@@ -204,10 +207,12 @@ def test_server_to_server_via_dpu(dpu, server, switch):
     print('Checking metrics on all configured ports ...')
     print('Expected\tTotal Tx\tTotal Rx')
     assert wait_for(lambda: metrics_ok(tgen)), 'Metrics validation failed!'
+    # the frames must have been routed by the dpu, not looped back through the switch
+    assert dpu_forwarded(dpu) - forwarded >= flow.duration.fixed_packets.packets, 'The dpu did not route the traffic!'
 
 
 def test_server_to_dpuhost_via_dpu(dpu, server, host, switch):
-    # server:p1 reaches the dpu on 200.0.0.0/24, the dpu routes it to host:p1 over pf0hpf
+    # server:p1 reaches the dpu on 200.0.0.0/24, the dpu routes it to host:p1 through ovsbr1 and pf0hpf
     switch(A100G_VLANS[0], [A100G_TGEN1_PORTS[1], A100G_BF2_PORTS[0]])
 
     tgen = snappi.api(location=f'https://{TGEN1_IP}:8443', verify=False)
@@ -243,6 +248,7 @@ def test_server_to_dpuhost_via_dpu(dpu, server, host, switch):
     tgen.set_config(cfg)
 
     print('Starting transmit on all configured flows ...')
+    forwarded = dpu_forwarded(dpu)
     cs = tgen.control_state()
     cs.traffic.flow_transmit.state = cs.traffic.flow_transmit.START
     tgen.set_control_state(cs)
@@ -250,9 +256,16 @@ def test_server_to_dpuhost_via_dpu(dpu, server, host, switch):
     print('Checking metrics on all configured ports ...')
     print('Expected\tTotal Tx\tTotal Rx')
     assert wait_for(lambda: metrics_ok(tgen)), 'Metrics validation failed!'
+    # the frames must have been routed by the dpu, not looped back through the switch
+    assert dpu_forwarded(dpu) - forwarded >= flow.duration.fixed_packets.packets, 'The dpu did not route the traffic!'
 
 
-def test_dpuhost_to_dpuhost_via_dpu(dpu, host):
+def test_dpuhost_to_dpuhost_via_dpu(dpu, host, switch):
+    # host:p2 reaches the dpu on 203.0.0.0/24, the dpu routes it to host:p1 on 202.0.0.0/24; ovs
+    # floods the routed frames out the uplinks too, so park each uplink alone in a vlan
+    switch(A100G_VLANS[0], [A100G_BF2_PORTS[0]])
+    switch(A100G_VLANS[1], [A100G_BF2_PORTS[1]])
+
     tgen = snappi.api(location=f'https://{DH2_IP}:8443', verify=False)
     cfg = tgen.config()
     p1 = cfg.ports.port(name='host:p1', location=f'{DH2_IP}:5555')[-1]
@@ -286,6 +299,7 @@ def test_dpuhost_to_dpuhost_via_dpu(dpu, host):
     tgen.set_config(cfg)
 
     print('Starting transmit on all configured flows ...')
+    forwarded = dpu_forwarded(dpu)
     cs = tgen.control_state()
     cs.traffic.flow_transmit.state = cs.traffic.flow_transmit.START
     tgen.set_control_state(cs)
@@ -293,6 +307,8 @@ def test_dpuhost_to_dpuhost_via_dpu(dpu, host):
     print('Checking metrics on all configured ports ...')
     print('Expected\tTotal Tx\tTotal Rx')
     assert wait_for(lambda: metrics_ok(tgen)), 'Metrics validation failed!'
+    # the frames must have been routed by the dpu, not looped back through the switch
+    assert dpu_forwarded(dpu) - forwarded >= flow.duration.fixed_packets.packets, 'The dpu did not route the traffic!'
 
 
 def dpu_mac(dpu_connect, peer_ip):
@@ -303,6 +319,14 @@ def dpu_mac(dpu_connect, peer_ip):
     route = dpu_connect.send_command('ip -o route get %s' % peer_ip)
     dev = route.split(' dev ')[1].split()[0]
     return dpu_connect.send_command('cat /sys/class/net/%s/address' % dev).strip()
+
+
+def dpu_forwarded(dpu_connect):
+    '''
+    Returns the dpu's Ip ForwDatagrams counter, which grows only when the arm kernel routes a packet.
+    '''
+    names, values = [line.split() for line in dpu_connect.send_command('grep ^Ip: /proc/net/snmp').splitlines()]
+    return int(values[names.index('ForwDatagrams')])
 
 
 def metrics_ok(api):
