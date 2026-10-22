@@ -80,6 +80,6 @@ see <https://github.com/opiproject/pydpu> and <https://github.com/opiproject/god
 # add python api lib to path
 git clone https://github.com/opiproject/opi-poc.git
 cd ./opi-poc/
-pip3 install -r demos/security/nvidia/requirements.txt
-pytest -s -v demos/security/nvidia/test_ipsec.py
+pip3 install -r demos/security/requirements.txt
+pytest -s -v demos/security/test_ipsec.py
 ```

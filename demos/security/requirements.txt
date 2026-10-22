@@ -1,0 +1,5 @@
+cyperf==26.1.2
+grpcio
+netmiko
+pydpu==0.2.1
+pytest

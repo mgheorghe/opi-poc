@@ -1,0 +1,47 @@
+# CyPerf client and server agents for the ipsec demo. The test moves one server port into each
+# agent's network namespace and registers the agents with the controller.
+services:
+    client:
+        image: public.ecr.aws/keysight/cyperf-agent:${CYPERF_AGENT_VERSION}
+        container_name: cyperf-client
+        hostname: opi-cyperf-client
+        restart: always
+        privileged: true
+        cpuset: ${CPU_CORES_IFC1:-"0"}
+        environment:
+            - AGENT_TAGS=Dockers-Group=CyPerf-Agent-Client
+            - AGENT_MANAGEMENT_INTERFACE=eth0
+            - AGENT_TEST_INTERFACE=${IFC1}
+        cap_add:
+            - NET_ADMIN
+            - IPC_LOCK
+            - NET_RAW
+        networks:
+            cyperf-mgmt-net:
+                ipv4_address: 192.168.220.10
+    server:
+        image: public.ecr.aws/keysight/cyperf-agent:${CYPERF_AGENT_VERSION}
+        container_name: cyperf-server
+        hostname: opi-cyperf-server
+        restart: always
+        privileged: true
+        cpuset: ${CPU_CORES_IFC2:-"1"}
+        environment:
+            - AGENT_TAGS=Dockers-Group=CyPerf-Agent-Server
+            - AGENT_MANAGEMENT_INTERFACE=eth0
+            - AGENT_TEST_INTERFACE=${IFC2}
+        cap_add:
+            - NET_ADMIN
+            - IPC_LOCK
+            - NET_RAW
+        networks:
+            cyperf-mgmt-net:
+                ipv4_address: 192.168.220.11
+
+networks:
+    cyperf-mgmt-net:
+        name: cyperf-mgmt-net
+        ipam:
+            config:
+                # not 192.168.0.0/24, which is the IPU IMC to ACC network
+                - subnet: "192.168.220.0/24"
