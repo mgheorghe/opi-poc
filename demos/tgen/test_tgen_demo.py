@@ -1,6 +1,7 @@
 import os
 import sys
 import netmiko
+import paramiko
 import pytest
 import snappi
 
@@ -12,6 +13,12 @@ HOME_FOLDER = os.environ.get('GITHUB_WORKSPACE',
                              os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 # private key used to ssh as root into the server, dpu and dpu host
 SSH_KEY = os.environ.get('OPI_SSH_KEY', os.path.expanduser('~/.ssh/id_rsa'))
+
+# systemd >= 257 (Ubuntu 26.04) wraps every shell prompt in OSC 3008 escapes with a fresh uuid,
+# which netmiko cannot match; its profile script skips TERM=dumb, but netmiko asks for vt100
+_invoke_shell = paramiko.SSHClient.invoke_shell
+paramiko.SSHClient.invoke_shell = lambda self, term='vt100', *args, **kwargs: \
+    _invoke_shell(self, 'dumb', *args, **kwargs)
 
 
 @pytest.fixture
