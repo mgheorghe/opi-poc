@@ -75,12 +75,19 @@ def dpu(lab_dpu):
     interfaces = lab_dpu['interfaces']
     undo = dpu_routing(dpu_connect, {'200.0.0.1/24': interfaces[0], '201.0.0.1/24': interfaces[1]})
 
+    # missing software is a lab gap, not a test failure; the e2100 ACC image ships neither
+    missing = [tool for tool in ('swanctl', 'docker|podman')
+               if not any(dpu_connect.send_command('command -v %s' % t).strip() for t in tool.split('|'))]
+    if missing:
+        undo()
+        dpu_connect.disconnect()
+        pytest.skip('%s: %s not installed' % (lab_dpu['name'], ' and '.join(missing)))
     # the bridge drives charon through its vici socket in /var/run
     if 'charon.vici' not in dpu_connect.send_command('ls /var/run'):
         dpu_connect.send_command('systemctl start %s' % variant['strongswan'])
     assert wait_for(lambda: 'charon.vici' in dpu_connect.send_command('ls /var/run'), timeout=30, interval=1), \
         '%s: strongSwan (charon) is not running' % lab_dpu['name']
-    runtime = 'docker' if 'docker' in dpu_connect.send_command('command -v docker') else 'podman'
+    runtime = 'docker' if dpu_connect.send_command('command -v docker').strip() else 'podman'
     dpu_connect.send_command('systemctl start %s' % runtime)
     dpu_connect.send_command('%s rm -f opi-strongswan-bridge' % runtime)
     output = dpu_connect.send_command('%s run --rm -d --network host --mount src=/var/run,target=/var/run,type=bind '
