@@ -1,16 +1,17 @@
 import os
-import grpc
+import sys
 import netmiko
-import pydpu
 import pytest
 import snappi
-import requests
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from testbed import *
 
-#HOME_FOLDER = r'/home/opi/actions-runner/_work/opi-poc/opi-poc'
-#HOME_FOLDER = r'/home/opi/opi-poc'
-HOME_FOLDER = os.environ['GITHUB_WORKSPACE'] 
+# repo checkout used for the docker compose files, the CI workspace or this clone
+HOME_FOLDER = os.environ.get('GITHUB_WORKSPACE',
+                             os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+# private key used to ssh as root into the server, dpu and dpu host
+SSH_KEY = os.environ.get('OPI_SSH_KEY', os.path.expanduser('~/.ssh/id_rsa'))
 
 
 @pytest.fixture
@@ -20,7 +21,7 @@ def dpu():
         'host': BF2_IP,
         'username': 'root',
         'use_keys': True,
-        'key_file': '/home/opi/.ssh/id_rsa.pub'
+        'key_file': SSH_KEY
     }
     dpu_connect = netmiko.ConnectHandler(**dpu_info)
     #prompt = dpu_connect.find_prompt()
@@ -54,6 +55,7 @@ def dpu():
     dpu_connect.send_command('ip neigh flush 201.0.0.0/8')
     dpu_connect.send_command('ip neigh flush 202.0.0.0/8')
     dpu_connect.send_command('ip neigh flush 203.0.0.0/8')
+    dpu_connect.disconnect()
 
 
 @pytest.fixture
@@ -63,7 +65,7 @@ def server():
         'host': TGEN1_IP,
         'username': 'root',
         'use_keys': True,
-        'key_file': '/home/opi/.ssh/id_rsa.pub'
+        'key_file': SSH_KEY
     }
     server_connect = netmiko.ConnectHandler(**server_info)
     output = server_connect.send_command('docker compose -f %s/demos/tgen/deployment/tgen.yml up -d' % HOME_FOLDER, read_timeout=30)
@@ -73,6 +75,7 @@ def server():
 
     output = server_connect.send_command('docker compose -f %s/demos/tgen/deployment/tgen.yml down' % HOME_FOLDER)
     print(output)
+    server_connect.disconnect()
 
 
 @pytest.fixture
@@ -88,7 +91,7 @@ def host():
         'host': DH2_IP,
         'username': 'root',
         'use_keys': True,
-        'key_file': '/home/opi/.ssh/id_rsa.pub'
+        'key_file': SSH_KEY
     }
     host_connect = netmiko.ConnectHandler(**host_info)
 
@@ -103,6 +106,7 @@ def host():
 
     output = host_connect.send_command('docker compose -f ~/tgen.yaml down')
     print(output)
+    host_connect.disconnect()
 
 
 def test_server_to_server_via_dpu(dpu, server):
@@ -122,7 +126,7 @@ def test_server_to_server_via_dpu(dpu, server):
 
     flow = cfg.flows.flow(name='flow server:p2 -> server:p1')[-1]
     flow.tx_rx.port.tx_name = p2.name
-    flow.tx_rx.port.rx_name = p1.name
+    flow.tx_rx.port.rx_names = [p1.name]
     flow.size.fixed = 256
     flow.duration.fixed_packets.packets = 1000
     flow.rate.pps = 1000
@@ -168,7 +172,7 @@ def test_server_to_dpuhost_via_dpu(dpu, server, host):
 
     flow = cfg.flows.flow(name='flow server:p2 -> host:p1')[-1]
     flow.tx_rx.port.tx_name = p2.name
-    flow.tx_rx.port.rx_name = p1.name
+    flow.tx_rx.port.rx_names = [p1.name]
     flow.size.fixed = 256
     flow.duration.fixed_packets.packets = 1000
     flow.rate.pps = 1000
@@ -211,7 +215,7 @@ def test_dpuhost_to_dpuhost_via_dpu(dpu, host):
 
     flow = cfg.flows.flow(name='flow host:p2 -> host:p1')[-1]
     flow.tx_rx.port.tx_name = p2.name
-    flow.tx_rx.port.rx_name = p1.name
+    flow.tx_rx.port.rx_names = [p1.name]
     flow.size.fixed = 256
     flow.duration.fixed_packets.packets = 1000
     flow.rate.pps = 1000
