@@ -315,9 +315,11 @@ def metrics_ok(api):
     req.port.column_names = [req.port.FRAMES_TX, req.port.FRAMES_RX]
     # fetch port metrics
     res = api.get_metrics(req)
-    # calculate total frames sent and received across all configured ports
+    # calculate total frames sent across all ports and received on the flows' rx ports only, so
+    # frames that loop back to the sender do not count as delivered
+    rx_ports = {n for f in cfg.flows for n in f.tx_rx.port.rx_names}
     total_tx = sum([m.frames_tx for m in res.port_metrics])
-    total_rx = sum([m.frames_rx for m in res.port_metrics])
+    total_rx = sum([m.frames_rx for m in res.port_metrics if m.name in rx_ports])
     expected = sum([f.duration.fixed_packets.packets for f in cfg.flows])
 
     print('%d\t\t%d\t\t%d' % (expected, total_tx, total_rx))
