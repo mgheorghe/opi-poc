@@ -1,5 +1,3 @@
-grpcio
-netmiko
-pydpu
-pytest
-snappi
+netmiko>=4.3
+pytest>=8
+snappi==1.62.0
