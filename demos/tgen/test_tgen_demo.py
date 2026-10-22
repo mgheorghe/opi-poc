@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import netmiko
@@ -116,7 +117,50 @@ def host():
     host_connect.disconnect()
 
 
-def test_server_to_server_via_dpu(dpu, server):
+@pytest.fixture
+def switch():
+    '''
+    Yields a function that moves switch ports into a vlan, so each test wires the tgen ports to the
+    dpu ports it needs. The original vlans are restored afterwards; the config is never saved.
+    '''
+    switch_info = {
+        'device_type': 'arista_eos',
+        'host': A100G_IP,
+        'username': 'arista',
+        'use_keys': True,
+        'key_file': SSH_KEY
+    }
+    switch_connect = netmiko.ConnectHandler(**switch_info)
+    switch_connect.enable()
+    saved_vlans = {}
+    new_vlans = []
+
+    def access_vlan(vlan, ports):
+        if 'not found' in switch_connect.send_command('show vlan %d' % vlan):
+            new_vlans.append(vlan)
+            switch_connect.send_config_set(['vlan %d' % vlan])
+        for port in ports:
+            if port not in saved_vlans:
+                info = json.loads(switch_connect.send_command('show interfaces %s switchport | json' % port))
+                info = info['switchports'][port]['switchportInfo']
+                assert info['mode'] == 'access', '%s is not an access port' % port
+                saved_vlans[port] = info['accessVlanId']
+            switch_connect.send_config_set(['interface %s' % port, 'switchport access vlan %d' % vlan])
+
+    yield access_vlan
+
+    for port, vlan in saved_vlans.items():
+        switch_connect.send_config_set(['interface %s' % port, 'switchport access vlan %d' % vlan])
+    for vlan in new_vlans:
+        switch_connect.send_config_set(['no vlan %d' % vlan])
+    switch_connect.disconnect()
+
+
+def test_server_to_server_via_dpu(dpu, server, switch):
+    # server:p2 reaches the dpu p1 side, the dpu routes the traffic out of p0 back to server:p1
+    switch(A100G_VLANS[0], [A100G_TGEN1_PORTS[0], A100G_BF2_PORTS[0]])
+    switch(A100G_VLANS[1], [A100G_TGEN1_PORTS[1], A100G_BF2_PORTS[1]])
+
     tgen = snappi.api(location=f'https://{TGEN1_IP}:8443', verify=False)
     cfg = tgen.config()
     p1 = cfg.ports.port(name='server:p1', location=f'{TGEN1_IP}:5555')[-1]
@@ -162,7 +206,10 @@ def test_server_to_server_via_dpu(dpu, server):
     assert wait_for(lambda: metrics_ok(tgen)), 'Metrics validation failed!'
 
 
-def test_server_to_dpuhost_via_dpu(dpu, server, host):
+def test_server_to_dpuhost_via_dpu(dpu, server, host, switch):
+    # server:p1 reaches the dpu p0 side, the dpu routes the traffic to host:p1 over pf0hpf
+    switch(A100G_VLANS[0], [A100G_TGEN1_PORTS[1], A100G_BF2_PORTS[0]])
+
     tgen = snappi.api(location=f'https://{TGEN1_IP}:8443', verify=False)
     cfg = tgen.config()
     p1 = cfg.ports.port(name='host:p1', location=f'{DH2_IP}:5555')[-1]

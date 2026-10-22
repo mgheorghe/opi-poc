@@ -26,5 +26,12 @@ TGEN1_IP = '172.22.1.100'
 TGEN1_INTERFACES = ['ens1f0np0', 'ens1f1np1']
 #TGEN1_INTERFACES = ['enp138s0f0np0', 'enp138s0f1np1']
 
+# Arista 100G switch between the tgen servers and the dpus
+A100G_IP = '172.22.1.250'
+A100G_TGEN1_PORTS = ['Ethernet25/1', 'Ethernet26/1']  # TGEN1_INTERFACES
+A100G_BF2_PORTS = ['Ethernet3/1', 'Ethernet4/1']  # BF2 p0, p1
+# free vlans the tests create to pair a tgen port with a dpu port
+A100G_VLANS = [3001, 3002]
+
 # CYPERF SERVER
 CYPERF_IP = '172.22.222.9'
