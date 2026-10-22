@@ -138,6 +138,7 @@ def switch():
     switch_connect.enable()
     saved_vlans = {}
     new_vlans = []
+    portfast_ports = []
 
     def access_vlan(vlan, ports):
         if 'not found' in switch_connect.send_command('show vlan %d' % vlan):
@@ -149,12 +150,22 @@ def switch():
                 info = info['switchports'][port]['switchportInfo']
                 assert info['mode'] == 'access', '%s is not an access port' % port
                 saved_vlans[port] = info['accessVlanId']
+                # a port that changes vlan restarts stp and discards for 20s before auto edge kicks
+                # in; portfast makes these host facing ports forward at once
+                if 'portfast' not in switch_connect.send_command('show running-config interfaces %s' % port):
+                    portfast_ports.append(port)
+                    switch_connect.send_config_set(['interface %s' % port, 'spanning-tree portfast'])
             switch_connect.send_config_set(['interface %s' % port, 'switchport access vlan %d' % vlan])
+        for port in ports:
+            assert wait_for(lambda: 'forwarding' in switch_connect.send_command('show spanning-tree interface %s' % port),
+                            timeout=40, interval=1), '%s is not forwarding' % port
 
     yield access_vlan
 
     for port, vlan in saved_vlans.items():
         switch_connect.send_config_set(['interface %s' % port, 'switchport access vlan %d' % vlan])
+    for port in portfast_ports:
+        switch_connect.send_config_set(['interface %s' % port, 'default spanning-tree portfast'])
     for vlan in new_vlans:
         switch_connect.send_config_set(['no vlan %d' % vlan])
     switch_connect.disconnect()
