@@ -139,7 +139,7 @@ def test_server_to_server_via_dpu(dpu, server):
     flow.rate.pps = 1000
     eth2, ip2, udp2 = flow.packet.ethernet().ipv4().udp()
     eth2.src.value = '00:1B:6E:00:00:01'
-    eth2.dst.value = '02:6a:82:5d:da:2c'
+    eth2.dst.value = dpu_mac(dpu, '201.0.0.2')
     ip2.src.value = '201.0.0.2'
     ip2.dst.value = '200.0.0.2'
     inc2 = udp2.src_port.increment
@@ -185,7 +185,7 @@ def test_server_to_dpuhost_via_dpu(dpu, server, host):
     flow.rate.pps = 1000
     eth2, ip2, udp2 = flow.packet.ethernet().ipv4().udp()
     eth2.src.value = '00:1B:6E:00:00:01'
-    eth2.dst.value = '02:6a:82:5d:da:2c'
+    eth2.dst.value = dpu_mac(dpu, '200.0.0.2')
     ip2.src.value = '200.0.0.2'
     ip2.dst.value = '202.0.0.2'
     inc2 = udp2.src_port.increment
@@ -228,7 +228,7 @@ def test_dpuhost_to_dpuhost_via_dpu(dpu, host):
     flow.rate.pps = 1000
     eth2, ip2, udp2 = flow.packet.ethernet().ipv4().udp()
     eth2.src.value = '00:1B:6E:00:00:01'
-    eth2.dst.value = '02:6a:82:5d:da:2c'
+    eth2.dst.value = dpu_mac(dpu, '203.0.0.2')
     ip2.src.value = '203.0.0.2'
     ip2.dst.value = '202.0.0.2'
     inc2 = udp2.src_port.increment
@@ -246,6 +246,16 @@ def test_dpuhost_to_dpuhost_via_dpu(dpu, host):
     print('Checking metrics on all configured ports ...')
     print('Expected\tTotal Tx\tTotal Rx')
     assert wait_for(lambda: metrics_ok(tgen)), 'Metrics validation failed!'
+
+
+def dpu_mac(dpu_connect, peer_ip):
+    '''
+    Returns the MAC of the dpu interface facing `peer_ip`, used as the flow destination so the
+    dpu routes the traffic. The sf and hpf MACs change whenever the dpu is reflashed.
+    '''
+    route = dpu_connect.send_command('ip -o route get %s' % peer_ip)
+    dev = route.split(' dev ')[1].split()[0]
+    return dpu_connect.send_command('cat /sys/class/net/%s/address' % dev).strip()
 
 
 def metrics_ok(api):
