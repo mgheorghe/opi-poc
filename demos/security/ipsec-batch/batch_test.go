@@ -35,8 +35,7 @@ var (
 
 const concurrency = 64
 
-// startServer serves an in-memory IpsecSaService on a loopback TCP port and
-// returns a client connected to it.
+// startServer serves an in-memory IpsecSaService and returns a connected client.
 func startServer(tb testing.TB) (*Server, pb.IpsecSaServiceClient) {
 	tb.Helper()
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -69,8 +68,7 @@ func ipv4(a uint32) *nc.IPAddress {
 	return &nc.IPAddress{Af: nc.IpAf_IP_AF_INET, V4OrV6: &nc.IPAddress_V4Addr{V4Addr: a}}
 }
 
-// saRequest builds a realistic tunnel-mode ESP SA: AES-256-GCM, a /32 to /32
-// traffic selector and unique tunnel endpoints.
+// saRequest builds a tunnel-mode ESP SA with unique endpoints.
 func saRequest(i int) *pb.CreateIpsecSaRequest {
 	local := 0x0a000000 + uint32(i)  // 10.x.x.x
 	remote := 0x14000000 + uint32(i) // 20.x.x.x
@@ -222,8 +220,7 @@ func estimate(d time.Duration, n, total int) string {
 	return (time.Duration(float64(d) * float64(total) / float64(n))).Round(time.Second).String()
 }
 
-// TestUnaryVersusBatch loads and unloads the same SAs with every mode, checks
-// that the SAD ends up with the right content, and reports the time taken.
+// TestUnaryVersusBatch times every load mode and checks the SAD content.
 func TestUnaryVersusBatch(t *testing.T) {
 	n := *numSas
 	reqs := saRequests(n)
@@ -290,9 +287,7 @@ func TestUnaryVersusBatch(t *testing.T) {
 	}
 }
 
-// TestBatchAtScale loads and unloads millions of SAs with the batch RPCs only.
-// Batches are built as they are sent, so the client never holds all the SAs.
-// Unary loading is left out: at these counts it takes hours.
+// TestBatchAtScale loads and unloads millions of SAs with batch RPCs only.
 func TestBatchAtScale(t *testing.T) {
 	if *scale == "" {
 		t.Skip("set -scale to run, e.g. -scale=1000000,32000000")

@@ -1,14 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Keysight Technologies
 
-// Package ipsecbatch measures how long it takes to load IPsec SAs through the
-// OPI security API one object per RPC versus with the batch RPCs
-// (BatchCreateIpsecSas / BatchDeleteIpsecSas).
-//
-// The server is an in-memory SAD, so the numbers isolate the cost of the API
-// itself (one gRPC round trip per object) from the cost of programming a DPU.
-// Each SA is kept in its wire encoding, the way an agent would keep a compact
-// entry per SA, so that tens of millions of SAs fit in memory.
+// Package ipsecbatch benchmarks unary versus batch IPsec SA RPCs against an in-memory SAD.
 package ipsecbatch
 
 import (

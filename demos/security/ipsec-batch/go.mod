@@ -18,8 +18,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
 )
 
-// The batch RPCs are in opiproject/opi-api#496. Drop these replace lines
-// once it is merged.
+// Drop these replace lines once opiproject/opi-api#496 merges.
 replace (
 	github.com/opiproject/opi-api/network/opinetcommon/v1alpha1/gen/go => github.com/mgheorghe/opi-api/network/opinetcommon/v1alpha1/gen/go v0.0.0-20261026183418-48a1ffe43abe
 	github.com/opiproject/opi-api/v1/gen/go/security => github.com/mgheorghe/opi-api/v1/gen/go/security v0.0.0-20261026183418-48a1ffe43abe
